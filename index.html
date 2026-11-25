@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rubik Solver</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#14161a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rubik">
+<style>
+  :root { --bg:#14161a; --fg:#e8e8ea; --card:#1f2228; --line:#363a44; --acc:#4da3ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg); font:15px/1.4 system-ui,sans-serif; max-width:960px; margin-inline:auto; }
+  h1 { font-size:20px; margin:0 0 12px; }
+  h2 { font-size:15px; margin:0 0 8px; }
+  .row { display:grid; gap:12px; grid-template-columns:1fr 1fr; }
+  @media (max-width:720px) { .row { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; }
+  button, .btn { background:#2d3340; color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:8px 12px; font:inherit; cursor:pointer; display:inline-block; }
+  button.primary { background:var(--acc); color:#001; border-color:var(--acc); font-weight:600; }
+  button:disabled { opacity:.5; cursor:default; }
+  .cam { position:relative; width:100%; aspect-ratio:1; background:#000; border-radius:6px; overflow:hidden; }
+  .cam video, .cam img { width:100%; height:100%; object-fit:cover; }
+  .guide { position:absolute; inset:15%; display:grid; grid-template:repeat(3,1fr)/repeat(3,1fr); border:2px solid #fff8; pointer-events:none; }
+  .guide i { border:1px solid #fff8; }
+  .net { display:grid; grid-template:repeat(3,auto)/repeat(4,auto); gap:6px; justify-content:center; }
+  .face { display:grid; grid-template:repeat(3,28px)/repeat(3,28px); gap:2px; padding:2px; border-radius:4px; }
+  .face.cur { outline:2px solid var(--acc); }
+  .face b { grid-column:1/-1; font-size:11px; text-align:center; line-height:12px; opacity:.6; display:none; }
+  .st { border:1px solid #0006; border-radius:3px; padding:0; width:28px; height:28px; }
+  .st.center { cursor:default; outline:2px solid #0008; outline-offset:-3px; }
+  .pal { display:flex; gap:6px; margin:10px 0 0; justify-content:center; }
+  .pal button { width:34px; height:34px; padding:0; }
+  .pal button.sel { outline:3px solid var(--acc); }
+  #status { margin:8px 0; min-height:1.4em; }
+  #status.err { color:#ff7b7b; }
+  #sol { font:600 18px ui-monospace,monospace; word-spacing:.3em; }
+  twisty-player { width:100%; height:260px; }
+  small { opacity:.7; }
+</style>
+</head>
+<body>
+<h1>Rubik Solver</h1>
+<div class="row">
+  <div class="card">
+    <h2>1. Quét 6 mặt — <span id="hint"></span></h2>
+    <div class="cam"><video id="vid" playsinline muted></video><img id="pic" hidden alt=""><div class="guide"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    <p style="margin:8px 0 0">
+      <button id="camBtn">Bật camera</button>
+      <button id="snap" class="primary" disabled>Chụp</button>
+      <label class="btn">Upload ảnh<input id="file" type="file" accept="image/*" hidden></label>
+    </p>
+    <small>Đặt 9 ô vào khung. Mặt tới lượt được tô sáng ở lưới bên phải.</small>
+  </div>
+  <div class="card">
+    <h2>2. Kiểm tra / sửa màu</h2>
+    <div class="net" id="net"></div>
+    <div class="pal" id="pal"></div>
+    <small>Chọn màu rồi bấm ô sai để sửa. Ô tâm cố định. Bấm vào mặt để quét lại mặt đó.</small>
+  </div>
+</div>
+<div class="card" style="margin-top:12px">
+  <h2>3. Lời giải</h2>
+  <button id="solve" class="primary">Giải</button>
+  <button id="reset">Đặt lại</button>
+  <div id="status"></div>
+  <div id="sol"></div>
+  <twisty-player id="tp" hidden control-panel="bottom-row" background="none"></twisty-player>
+</div>
+
+<script src="lib/cube.js"></script>
+<script src="lib/solve.js"></script>
+<script type="module" src="https://cdn.cubing.net/v0/js/cubing/twisty"></script>
+<script>
+const F = 'URFDLB';
+// Cầm khối sao cho mặt cần quét hướng vào camera; ngoài ra giữ "cạnh trên" như sau.
+const HINT = {
+  U:'mặt U hướng camera, cạnh B ở trên', R:'mặt R hướng camera, mặt U ở trên',
+  F:'mặt F hướng camera, mặt U ở trên', D:'mặt D hướng camera, cạnh F ở trên',
+  L:'mặt L hướng camera, mặt U ở trên', B:'mặt B hướng camera, mặt U ở trên' };
+const DEF = { U:'#ffffff', R:'#e02020', F:'#1fa83a', D:'#ffd500', L:'#ff7a00', B:'#1f5fe0' };
+
+let cube, pal, raw, rawPaint, cur, brush;
+const $ = id => document.getElementById(id);
+const status = (t, err) => { $('status').textContent = t; $('status').className = err ? 'err' : ''; };
+
+function reset() {
+  cube = [...F].flatMap(f => Array(9).fill(f));
+  pal = { ...DEF }; raw = Array(6).fill(null); rawPaint = Array(54).fill(null);
+  cur = 0; brush = 'U';
+  $('sol').textContent = ''; $('tp').hidden = true; status('');
+  render();
+}
+
+function render() {
+  const net = $('net'); net.innerHTML = '';
+  // bố cục: hàng 0 = U, hàng 1 = L F R B, hàng 2 = D
+  const pos = { U:[0,1], L:[1,0], F:[1,1], R:[1,2], B:[1,3], D:[2,1] };
+  for (const f of F) {
+    const fi = F.indexOf(f), d = document.createElement('div');
+    d.className = 'face' + (fi === cur ? ' cur' : '');
+    d.style.gridRow = pos[f][0] + 1; d.style.gridColumn = pos[f][1] + 1;
+    for (let k = 0; k < 9; k++) {
+      const i = fi * 9 + k, s = document.createElement('button');
+      s.className = 'st' + (k === 4 ? ' center' : '');
+      s.style.background = rawPaint[i] || pal[cube[i]];
+      s.title = f + (k + 1);
+      s.onclick = e => { e.stopPropagation(); if (k !== 4) { cube[i] = brush; rawPaint[i] = null; render(); } };
+      d.appendChild(s);
+    }
+    d.onclick = () => { cur = fi; render(); };
+    net.appendChild(d);
+  }
+  const p = $('pal'); p.innerHTML = '';
+  for (const f of F) {
+    const b = document.createElement('button');
+    b.style.background = pal[f]; b.title = f; b.className = f === brush ? 'sel' : '';
+    b.onclick = () => { brush = f; render(); };
+    p.appendChild(b);
+  }
+  $('hint').textContent = F[cur] + ': ' + HINT[F[cur]];
+}
+
+/* ---- màu: sRGB -> LAB ---- */
+function lab([r, g, b]) {
+  const l = c => (c /= 255) <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4;
+  const [R, G, B] = [l(r), l(g), l(b)];
+  const xyz = [(R*.4124+G*.3576+B*.1805)/.95047, R*.2126+G*.7152+B*.0722, (R*.0193+G*.1192+B*.9505)/1.08883];
+  const f = t => t > .008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+  const [x, y, z] = xyz.map(f);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+const dist = (a, b) => Math.hypot(a[0]-b[0], a[1]-b[1], a[2]-b[2]);
+
+// Tâm 6 mặt = màu chuẩn của 6 màu; gán 48 ô còn lại vào tâm gần nhất.
+function classify() {
+  const cl = raw.map(r => lab(r[4]));
+  raw.forEach((r, fi) => { pal[F[fi]] = `rgb(${r[4].join(',')})`; });
+  raw.forEach((r, fi) => r.forEach((rgb, k) => {
+    const i = fi * 9 + k, L = lab(rgb);
+    let best = 0;
+    cl.forEach((c, j) => { if (dist(L, c) < dist(L, cl[best])) best = j; });
+    cube[i] = k === 4 ? F[fi] : F[best]; rawPaint[i] = null;
+  }));
+}
+
+/* ---- camera / ảnh ---- */
+let stream;
+$('camBtn').onclick = async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    $('vid').srcObject = stream; await $('vid').play();
+    $('vid').hidden = false; $('pic').hidden = true; $('snap').disabled = false; status('');
+  } catch (e) { status('Không mở được camera: ' + e.message + ' (dùng Upload ảnh)', true); }
+};
+$('snap').onclick = () => scanFrom($('vid'), $('vid').videoWidth, $('vid').videoHeight);
+$('file').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = $('pic'); img.onload = () => {
+    $('vid').hidden = true; img.hidden = false; scanFrom(img, img.naturalWidth, img.naturalHeight);
+  };
+  img.src = URL.createObjectURL(f); e.target.value = '';
+};
+
+function scanFrom(src, w, h) {
+  const S = 300, c = document.createElement('canvas'); c.width = c.height = S;
+  const x = c.getContext('2d', { willReadFrequently: true }), side = Math.min(w, h);
+  x.drawImage(src, (w - side) / 2, (h - side) / 2, side, side, 0, 0, S, S); // crop vuông giữa, khớp object-fit:cover
+  const g0 = S * .15, cell = S * .7 / 3, p = Math.round(cell * .3), out = [];
+  for (let r = 0; r < 3; r++) for (let q = 0; q < 3; q++) {
+    const cx = g0 + cell * (q + .5), cy = g0 + cell * (r + .5);
+    const d = x.getImageData(cx - p / 2, cy - p / 2, p, p).data, s = [0, 0, 0];
+    for (let i = 0; i < d.length; i += 4) { s[0] += d[i]; s[1] += d[i+1]; s[2] += d[i+2]; }
+    const n = d.length / 4; out.push(s.map(v => Math.round(v / n)));
+  }
+  raw[cur] = out;
+  out.forEach((rgb, k) => rawPaint[cur * 9 + k] = `rgb(${rgb.join(',')})`); // xem màu thô ngay
+  if (raw.every(Boolean)) { classify(); status('Đã quét đủ 6 mặt. Kiểm tra màu rồi bấm Giải.'); }
+  else status(`Đã quét mặt ${F[cur]}.`);
+  cur = raw.findIndex(r => !r); if (cur < 0) cur = 0;
+  render();
+}
+
+/* ---- giải ---- */
+// cubejs không tự kiểm tra; khối bất khả làm solve() chạy vô hạn → chặn trước.
+function valid(c) {
+  const perm = (a, n) => a.length === n && new Set(a).size === n && a.every(v => Number.isInteger(v) && v >= 0 && v < n);
+  const par = a => { let p = 0; for (let i = 0; i < a.length; i++) for (let j = i + 1; j < a.length; j++) if (a[i] > a[j]) p ^= 1; return p; };
+  const sum = a => a.reduce((x, y) => x + y, 0);
+  return perm(c.cp, 8) && perm(c.ep, 12) && sum(c.co) % 3 === 0 && sum(c.eo) % 2 === 0 && par(c.cp) === par(c.ep);
+}
+$('solve').onclick = () => {
+  const s = cube.join('');
+  for (const f of F) {
+    const n = cube.filter(v => v === f).length;
+    if (n !== 9) return status(`Màu ${f} có ${n} ô (cần 9). Sửa lại màu.`, true);
+  }
+  status('Đang giải… (lần đầu khởi tạo solver mất vài giây)');
+  setTimeout(() => {
+    try {
+      if (!Cube.initSolver.done) { Cube.initSolver(); Cube.initSolver.done = true; }
+      const c = Cube.fromString(s);
+      if (!valid(c)) throw new Error('trạng thái bất khả (ô sai màu, cạnh/góc xoay hoặc tráo sai)');
+      const sol = c.solve();
+      c.move(sol);
+      if (!c.isSolved()) throw new Error('khối không hợp lệ');
+      $('sol').textContent = sol || '(đã giải sẵn)';
+      status(`${sol ? sol.split(' ').length : 0} nước.`);
+      const tp = $('tp'); tp.hidden = false;
+      tp.setAttribute('experimental-setup-alg', Cube.inverse(sol)); // từ trạng thái giải sẵn đi ngược về khối hiện tại
+      tp.setAttribute('alg', sol);
+    } catch (e) {
+      $('sol').textContent = ''; $('tp').hidden = true;
+      status('Không giải được: ' + e.message + '. Có ô sai màu hoặc khối bị tháo lắp sai — kiểm tra lại.', true);
+    }
+  }, 30);
+};
+$('reset').onclick = reset;
+reset();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
