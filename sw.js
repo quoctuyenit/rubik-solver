@@ -1,5 +1,5 @@
 // Đổi VERSION mỗi lần sửa file để máy khách tải bản mới.
-const VERSION = 'rubik-v2';
+const VERSION = 'rubik-v3';
 const CORE = ['./', './index.html', './manifest.webmanifest', './lib/cube.js', './lib/solve.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 

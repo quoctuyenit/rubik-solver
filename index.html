@@ -3,7 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rubik Solver</title>
+<title>Giải Rubik online bằng camera – quét ảnh ra lời giải | Rubik Solver</title>
+<meta name="description" content="Giải khối Rubik 3x3 online miễn phí: quét 6 mặt bằng camera hoặc ảnh, tự nhận màu và ra lời giải ngắn. Cài như app trên điện thoại, chạy offline.">
+<link rel="canonical" href="https://quoctuyenit.github.io/rubik-solver/">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="vi_VN">
+<meta property="og:site_name" content="Rubik Solver">
+<meta property="og:title" content="Giải Rubik online bằng camera – quét ảnh ra lời giải">
+<meta property="og:description" content="Quét 6 mặt khối Rubik 3x3 bằng camera, nhận màu tự động và nhận lời giải ngắn. Miễn phí, dùng được offline.">
+<meta property="og:url" content="https://quoctuyenit.github.io/rubik-solver/">
+<meta property="og:image" content="https://quoctuyenit.github.io/rubik-solver/icons/icon-512.png">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"Rubik Solver",
+ "url":"https://quoctuyenit.github.io/rubik-solver/","inLanguage":"vi",
+ "description":"Giải khối Rubik 3x3 bằng cách quét 6 mặt qua camera hoặc ảnh.",
+ "applicationCategory":"UtilitiesApplication","operatingSystem":"Any (trình duyệt web)",
+ "browserRequirements":"Cần trình duyệt có camera và JavaScript",
+ "offers":{"@type":"Offer","price":"0","priceCurrency":"VND"}}
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -44,7 +63,8 @@
 </style>
 </head>
 <body>
-<h1>Rubik Solver</h1>
+<h1>Giải Rubik 3x3 online bằng camera</h1>
+<p style="margin:0 0 12px;opacity:.8">Quét 6 mặt khối Rubik, trang tự nhận màu và đưa ra lời giải từng bước. Miễn phí, chạy ngay trong trình duyệt.</p>
 <div class="row">
   <div class="card">
     <h2>1. Quét 6 mặt</h2>
@@ -72,6 +92,25 @@
   <div id="sol"></div>
   <twisty-player id="tp" hidden control-panel="bottom-row" background="none"></twisty-player>
 </div>
+
+<section class="card" style="margin-top:12px">
+  <h2>Cách giải Rubik bằng camera</h2>
+  <ol>
+    <li>Cầm khối với tâm trắng ở trên, tâm xanh lá hướng về camera.</li>
+    <li>Bấm <b>Bật camera</b>, đặt 9 ô của mặt vào khung 3x3 rồi bấm <b>Chụp</b>.</li>
+    <li>Làm theo hướng dẫn xoay khối để quét đủ 6 mặt: xanh lá, đỏ, xanh dương, cam, trắng, vàng.</li>
+    <li>Kiểm tra màu, bấm vào ô sai để sửa, rồi bấm <b>Giải</b> để nhận chuỗi nước đi.</li>
+  </ol>
+  <h2>Câu hỏi thường gặp</h2>
+  <h3>Trang giải được loại Rubik nào?</h3>
+  <p>Khối Rubik 3x3 tiêu chuẩn. Lời giải dùng thuật toán Kociemba, thường dưới 22 nước.</p>
+  <h3>Có dùng được không cần mạng không?</h3>
+  <p>Có. Sau lần mở đầu, trang lưu sẵn trong máy và chạy offline. Bạn có thể thêm vào màn hình chính như một ứng dụng.</p>
+  <h3>Vì sao trang báo trạng thái không hợp lệ?</h3>
+  <p>Thường do nhận sai màu (đỏ/cam, trắng/vàng) hoặc quét sai hướng một mặt. Hãy sửa lại các ô sai trong lưới màu rồi giải lại.</p>
+  <h3>Ảnh của tôi có bị gửi đi đâu không?</h3>
+  <p>Không. Ảnh được xử lý hoàn toàn trên thiết bị của bạn, không tải lên máy chủ.</p>
+</section>
 
 <script src="lib/cube.js"></script>
 <script src="lib/solve.js"></script>
