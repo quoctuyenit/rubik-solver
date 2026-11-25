@@ -47,7 +47,8 @@
 <h1>Rubik Solver</h1>
 <div class="row">
   <div class="card">
-    <h2>1. Quét 6 mặt — <span id="hint"></span></h2>
+    <h2>1. Quét 6 mặt</h2>
+    <div id="hint" style="background:#2d3340;border-radius:6px;padding:8px 10px;margin-bottom:8px"></div>
     <div class="cam"><video id="vid" playsinline muted></video><img id="pic" hidden alt=""><div class="guide"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
     <p style="margin:8px 0 0">
       <button id="camBtn">Bật camera</button>
@@ -77,11 +78,16 @@
 <script type="module" src="https://cdn.cubing.net/v0/js/cubing/twisty"></script>
 <script>
 const F = 'URFDLB';
-// Cầm khối sao cho mặt cần quét hướng vào camera; ngoài ra giữ "cạnh trên" như sau.
+// Thứ tự quét tối thiểu thao tác: xoay ngang F→R→B→L, rồi ngả lên U, ngả xuống D.
+// Hướng ảnh phải khớp thứ tự ô của solver: mặt bên có U ở trên; U có B ở trên; D có F ở trên.
+const SCAN = 'FRBLUD';
 const HINT = {
-  U:'mặt U hướng camera, cạnh B ở trên', R:'mặt R hướng camera, mặt U ở trên',
-  F:'mặt F hướng camera, mặt U ở trên', D:'mặt D hướng camera, cạnh F ở trên',
-  L:'mặt L hướng camera, mặt U ở trên', B:'mặt B hướng camera, mặt U ở trên' };
+  F:'Vị trí ban đầu: tâm TRẮNG ở trên, tâm XANH LÁ hướng camera.',
+  R:'Xoay cả khối quanh trục đứng, đưa mặt bên phải (ĐỎ) về phía camera. Mặt trắng vẫn ở trên.',
+  B:'Xoay tiếp cùng chiều: mặt XANH DƯƠNG (đối diện xanh lá) hướng camera. Trắng vẫn ở trên.',
+  L:'Xoay tiếp cùng chiều: mặt CAM hướng camera. Trắng vẫn ở trên.',
+  U:'Xoay tiếp cùng chiều về vị trí ban đầu (xanh lá hướng camera), rồi ngả ĐỈNH khối về phía bạn: mặt TRẮNG hướng camera, cạnh trên của ảnh là mặt xanh dương.',
+  D:'Quay về vị trí ban đầu, rồi ngả ĐÁY khối về phía bạn: mặt VÀNG hướng camera, cạnh trên của ảnh là mặt xanh lá.' };
 const DEF = { U:'#ffffff', R:'#e02020', F:'#1fa83a', D:'#ffd500', L:'#ff7a00', B:'#1f5fe0' };
 
 let cube, pal, raw, rawPaint, cur, brush;
@@ -91,7 +97,7 @@ const status = (t, err) => { $('status').textContent = t; $('status').className 
 function reset() {
   cube = [...F].flatMap(f => Array(9).fill(f));
   pal = { ...DEF }; raw = Array(6).fill(null); rawPaint = Array(54).fill(null);
-  cur = 0; brush = 'U';
+  cur = F.indexOf(SCAN[0]); brush = 'U';
   $('sol').textContent = ''; $('tp').hidden = true; status('');
   render();
 }
@@ -122,7 +128,7 @@ function render() {
     b.onclick = () => { brush = f; render(); };
     p.appendChild(b);
   }
-  $('hint').textContent = F[cur] + ': ' + HINT[F[cur]];
+  $('hint').innerHTML = `<b>Bước ${SCAN.indexOf(F[cur]) + 1}/6 — mặt ${F[cur]}</b><br>${HINT[F[cur]]}`;
 }
 
 /* ---- màu: sRGB -> LAB ---- */
@@ -181,7 +187,8 @@ function scanFrom(src, w, h) {
   out.forEach((rgb, k) => rawPaint[cur * 9 + k] = `rgb(${rgb.join(',')})`); // xem màu thô ngay
   if (raw.every(Boolean)) { classify(); status('Đã quét đủ 6 mặt. Kiểm tra màu rồi bấm Giải.'); }
   else status(`Đã quét mặt ${F[cur]}.`);
-  cur = raw.findIndex(r => !r); if (cur < 0) cur = 0;
+  const nx = [...SCAN].map(f => F.indexOf(f)).find(i => !raw[i]);
+  if (nx !== undefined) cur = nx;
   render();
 }
 
